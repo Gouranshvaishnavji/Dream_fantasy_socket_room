@@ -1,0 +1,30 @@
+.room-page {
+  padding: 20px;
+}
+
+.room-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.available-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.available-players button {
+  padding: 6px 12px;
+  background: #2196f3;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+}
+
+.available-players button:disabled {
+  background: #bdbdbd;
+  cursor: not-allowed;
+}
