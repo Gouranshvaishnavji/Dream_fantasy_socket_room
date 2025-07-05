@@ -1,102 +1,80 @@
-import redis from '../utils/redisClient.js';
-import { getRoomKey, initializeRoom } from '../controllers/roomController.js';
+import Room from '../models/Room.js';
+import { getAllPlayers } from '../utils/playerPool.js';
+import redisClient from '../config/redisClient.js';
 
-export const registerRoomHandlers = (io, socket) => {
+// handle socket events
+const roomHandler = (io, socket) => {
   socket.on('join-room', async ({ roomId, username }) => {
+    console.log(`new dude tryna join room ${roomId} as ${username}`);
+
     socket.join(roomId);
-    let roomData = await getRoomData(roomId);
-    if (!roomData) {
-      roomData = initializeRoom();
+
+    const room = await Room.findOne({ roomId });
+    if (!room) {
+      console.log('room not found... awkward');
+      return;
     }
 
-    if (!roomData.users.find(u => u.id === socket.id)) {
-      roomData.users.push({ id: socket.id, username });
-    }
+    room.players.push({ username, selectedPlayers: [] });
+    await room.save();
 
-    await saveRoom(roomId, roomData);
-    io.to(roomId).emit('room-updated', roomData);
+    io.to(roomId).emit('player-joined', { username });
   });
 
   socket.on('start-selection', async ({ roomId }) => {
-    let roomData = await getRoomData(roomId);
-    if (!roomData) return;
+    console.log('host started the draft, no going back now');
 
-    roomData.turnOrder = [...roomData.users].sort(() => Math.random() - 0.5);
-    roomData.started = true;
-    roomData.currentTurnIndex = 0;
+    const room = await Room.findOne({ roomId });
+    if (!room) return;
 
-    await saveRoom(roomId, roomData);
-    io.to(roomId).emit('selection-started', roomData);
+    const shuffled = room.players.map(p => p.username).sort(() => Math.random() - 0.5);
+    room.turnOrder = shuffled;
+    room.currentTurn = 0;
+    await room.save();
 
-    startTurn(io, roomId);
+    await redisClient.set(`room:${roomId}`, JSON.stringify(room));
+
+    io.to(roomId).emit('selection-started', { order: shuffled });
   });
 
-  socket.on('select-player', async ({ roomId, playerName }) => {
-    let roomData = await getRoomData(roomId);
-    if (!roomData || !roomData.started) return;
+  socket.on('select-player', async ({ roomId, username, player }) => {
+    console.log(`${username} picked ${player}... hope it was good`);
 
-    const currentUser = roomData.turnOrder[roomData.currentTurnIndex];
-    if (currentUser.id !== socket.id) return;
+    const room = await Room.findOne({ roomId });
+    if (!room) return;
 
-    roomData.selections[socket.id] = roomData.selections[socket.id] || [];
-    roomData.selections[socket.id].push(playerName);
-    roomData.playersPool = roomData.playersPool.filter(p => p !== playerName);
+    if (!room.availablePlayers.includes(player)) {
+      console.log('dude picked a ghost player, wtf');
+      return;
+    }
 
-    clearTimeout(roomData.currentTurnTimer);
-    await saveRoom(roomId, roomData);
+    const playerObj = room.players.find(p => p.username === username);
+    if (!playerObj) return;
 
-    io.to(roomId).emit('player-picked', { playerName, userId: socket.id });
-    await nextTurnOrEnd(io, roomId);
+    playerObj.selectedPlayers.push(player);
+
+    // remove from available
+    room.availablePlayers = room.availablePlayers.filter(p => p !== player);
+
+    // move to next turn
+    room.currentTurn = (room.currentTurn + 1) % room.turnOrder.length;
+
+    await room.save();
+    await redisClient.set(`room:${roomId}`, JSON.stringify(room));
+
+    io.to(roomId).emit('player-selected', {
+      username,
+      player,
+      nextTurn: room.turnOrder[room.currentTurn],
+    });
+
+    // if all done
+    const everyoneDone = room.players.every(p => p.selectedPlayers.length >= 5);
+    if (everyoneDone) {
+      io.to(roomId).emit('selection-ended', { final: room.players });
+      console.log('all done gamblers, good luck with these squads');
+    }
   });
 };
 
-const getRoomData = async (roomId) => {
-  const data = await redis.get(getRoomKey(roomId));
-  return data ? JSON.parse(data) : null;
-};
-
-const saveRoom = async (roomId, data) => {
-  const toSave = { ...data };
-  delete toSave.currentTurnTimer;
-  await redis.set(getRoomKey(roomId), JSON.stringify(toSave));
-};
-
-const startTurn = async (io, roomId) => {
-  let roomData = await getRoomData(roomId);
-  if (!roomData) return;
-
-  const currentUser = roomData.turnOrder[roomData.currentTurnIndex];
-
-  io.to(roomId).emit('turn-started', { userId: currentUser.id, username: currentUser.username });
-
-  const timer = setTimeout(async () => {
-    const autoPlayer = roomData.playersPool[0];
-    roomData.selections[currentUser.id] = roomData.selections[currentUser.id] || [];
-    roomData.selections[currentUser.id].push(autoPlayer);
-    roomData.playersPool = roomData.playersPool.filter(p => p !== autoPlayer);
-
-    await saveRoom(roomId, roomData);
-    io.to(roomId).emit('player-auto-picked', { playerName: autoPlayer, userId: currentUser.id });
-
-    await nextTurnOrEnd(io, roomId);
-  }, 10000);
-
-  roomData.currentTurnTimer = timer;
-  await saveRoom(roomId, roomData);
-};
-
-const nextTurnOrEnd = async (io, roomId) => {
-  let roomData = await getRoomData(roomId);
-  if (!roomData) return;
-
-  const allDone = roomData.turnOrder.every(u => (roomData.selections[u.id] || []).length >= 5);
-
-  if (allDone) {
-    io.to(roomId).emit('selection-ended', roomData.selections);
-    await redis.del(getRoomKey(roomId));
-  } else {
-    roomData.currentTurnIndex = (roomData.currentTurnIndex + 1) % roomData.turnOrder.length;
-    await saveRoom(roomId, roomData);
-    startTurn(io, roomId);
-  }
-};
+export default roomHandler;

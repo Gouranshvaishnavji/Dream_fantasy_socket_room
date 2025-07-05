@@ -1,16 +1,38 @@
-export const allPlayers = [
-  "Virat Kohli", "Rohit Sharma", "Jasprit Bumrah", "Rishabh Pant", "Hardik Pandya",
-  "KL Rahul", "Shubman Gill", "Suryakumar Yadav", "Yuzvendra Chahal", "Ravindra Jadeja",
-  "Mohammed Shami", "Shreyas Iyer", "Axar Patel", "Ishan Kishan", "Prithvi Shaw"
-];
+import Room from '../models/Room.js';
+import { getAllPlayers } from '../utils/playerPool.js';
 
-export const getRoomKey = (roomId) => `room:${roomId}`;
+// create room
+export const createRoom = async (req, res) => {
+  try {
+    const { roomId, host } = req.body;
 
-export const initializeRoom = () => ({
-  playersPool: [...allPlayers],
-  users: [],
-  selections: {},
-  turnOrder: [],
-  currentTurnIndex: 0,
-  started: false,
-});
+    const room = new Room({
+      roomId,
+      host,
+      players: [],
+      availablePlayers: getAllPlayers(),
+      turnOrder: [],
+      currentTurn: 0,
+    });
+
+    await room.save();
+    res.status(201).json(room);
+  } catch (error) {
+    console.log('dude error creating room: ', error);
+    res.status(500).json({ error: 'could not create room' });
+  }
+};
+
+// get room
+export const getRoom = async (req, res) => {
+  try {
+    const room = await Room.findOne({ roomId: req.params.roomId });
+    if (!room) {
+      return res.status(404).json({ error: 'room not found' });
+    }
+    res.json(room);
+  } catch (error) {
+    console.log('error fetching room: ', error);
+    res.status(500).json({ error: 'could not fetch room' });
+  }
+};

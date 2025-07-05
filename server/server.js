@@ -1,34 +1,45 @@
-import express from 'express';
-import http from 'http';
+import app from './app.js';
+import { createServer } from 'http';
 import { Server } from 'socket.io';
+import connectDB from './config/db.js';
+import redisClient from './config/redisClient.js';
+import roomHandler from './SocketHandlers/roomHandler.js';
 import dotenv from 'dotenv';
-import cors from 'cors';
-import { registerRoomHandlers } from './SocketHandlers/roomHandler.js';
-import redis from './utils/redisClient.js';
 
 dotenv.config();
 
-const app = express();
-app.use(cors());
+// connect to mongo, yo
+connectDB();
 
-const server = http.createServer(app);
+// setup express http server
+const server = createServer(app);
+
+// setup socket.io on top of that http server
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL,
-    methods: ["GET", "POST"]
-  }
+    origin: process.env.FRONTEND_URL || '*',
+    methods: ['GET', 'POST'],
+  },
 });
 
+// hook up socket logic
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  registerRoomHandlers(io, socket);
+  console.log('new user connected... hope we stay friendly');
 
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
+  roomHandler(io, socket);
+});
+
+// make sure redis connected too
+redisClient.on('connect', () => {
+  console.log('redis finally connected, took him long enough');
+});
+
+redisClient.on('error', (err) => {
+  console.log('dude redis messed up: ', err);
 });
 
 const PORT = process.env.PORT || 5000;
+
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`server running on port ${PORT}, dont break stuff pls`);
 });
