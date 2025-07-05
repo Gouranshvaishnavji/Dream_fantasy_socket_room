@@ -2,29 +2,122 @@
   padding: 20px;
 }
 
+.room-container {
+  max-width: 600px;
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  padding: 32px 24px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
 .room-header {
   display: flex;
   gap: 10px;
   align-items: center;
 }
 
+.room-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #1a237e;
+  text-align: center;
+}
+
+.room-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.room-form input {
+  padding: 10px 14px;
+  border: 1px solid #bdbdbd;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  transition: border 0.2s;
+}
+
+.room-form input:focus {
+  border: 1.5px solid #3949ab;
+}
+
+.room-form button {
+  padding: 12px 0;
+  background: linear-gradient(90deg, #3949ab 60%, #1e88e5 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(30, 136, 229, 0.08);
+}
+
+.room-form button:hover {
+  background: linear-gradient(90deg, #1e88e5 60%, #3949ab 100%);
+}
+
+.players-list {
+  margin: 18px 0 8px 0;
+  font-size: 1.1rem;
+  color: #333;
+}
+
 .available-players {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 15px;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .available-players button {
-  padding: 6px 12px;
-  background: #2196f3;
-  border: none;
-  border-radius: 5px;
-  color: white;
+  background: #e3eafc;
+  color: #1a237e;
+  border: 1px solid #90caf9;
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.2s, color 0.2s, border 0.2s;
 }
 
 .available-players button:disabled {
-  background: #bdbdbd;
+  background: #f5f5f5;
+  color: #bdbdbd;
+  border: 1px solid #e0e0e0;
   cursor: not-allowed;
+}
+
+.available-players button:not(:disabled):hover {
+  background: #3949ab;
+  color: #fff;
+  border: 1px solid #1e88e5;
+}
+
+.current-turn {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #3949ab;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+  .room-container {
+    padding: 16px 4px;
+  }
+
+  .available-players {
+    gap: 6px;
+  }
+
+  .room-title {
+    font-size: 1.3rem;
+  }
 }
